@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: audit-postgres
+    environment:
+      POSTGRES_USER: nestsms
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: audit_dev
+    ports: ["5433:5432"]
+  redis:
+    image: redis:7
+    container_name: audit-redis
+    ports: ["6379:6379"]
