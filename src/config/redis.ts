@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv';
 import IORedis from 'ioredis';
 
 export const connection = new IORedis(process.env.REDIS_URL!, {

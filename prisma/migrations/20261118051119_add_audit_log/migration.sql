@@ -1,4 +1,4 @@
-    -- CreateTable
+-- CreateTable
 CREATE TABLE "audit_logs" (
     "id" UUID NOT NULL,
     "eventId" UUID NOT NULL,

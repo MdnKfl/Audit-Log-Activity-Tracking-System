@@ -3,8 +3,7 @@ import { auditQueue } from './queues/audit-log.queue';
 import { connection } from './config/redis';
 
 async function main() {
-  const eventId = randomUUID();
-
+const eventId = process.argv[2] ?? randomUUID();
   const event = {
     eventId,
     userId: 'user-123', 
@@ -18,7 +17,7 @@ async function main() {
 
   await auditQueue.add('audit.log', event, { jobId: eventId });
   console.log('Job added with eventId:', eventId);
-
+  
   await auditQueue.close(); 
   await connection.quit();
 }
