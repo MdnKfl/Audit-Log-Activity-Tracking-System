@@ -3,7 +3,7 @@ import { auditQueue } from './queues/audit-log.queue';
 import { connection } from './config/redis';
 
 async function main() {
-const eventId = process.argv[2] ?? randomUUID();
+const eventId =randomUUID();
   const event = {
     eventId,
     userId: 'user-123', 
