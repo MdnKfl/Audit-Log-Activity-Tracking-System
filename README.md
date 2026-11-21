@@ -43,7 +43,7 @@ Client → Express API → User service ─┬─ transaction ─→ Main Postgr
 
 | Area | Choice |
 |---|---|
-| Runtime | Node.js, TypeScript (run with `tsx`) |
+| Runtime | Node.js and TypeScript (`tsx` loader, started with `node --import tsx`) |
 | Framework | Express |
 | Queue | BullMQ + ioredis + Redis 7 |
 | Databases | Two PostgreSQL databases: `audit_dev` and `audit_logs_dev` |
@@ -102,7 +102,7 @@ Defined in `src/infrastructure/redis/audit.queue.ts` (queue name `nestsms-audit-
 | `backoff` | exponential, 2000 ms | wait about 2s, then 4s between attempts |
 | `removeOnComplete` | 1 day / 1000 jobs | keeps Redis memory bounded |
 | `removeOnFail` | 7 days | failed jobs are kept for debugging |
-| `jobId` | the event's `eventId` | prevents the same id being queued twice |
+| `jobId` | the event's `eventId` | deduplicates repeat publishes while the Redis job is retained |
 
 The worker runs with `concurrency: 5`.
 
@@ -110,9 +110,39 @@ The worker runs with `concurrency: 5`.
 
 After starting the API, open [http://localhost:3000/api-docs](http://localhost:3000/api-docs). Use **Try it out** to call the endpoints. The raw OpenAPI document is at `/openapi.json`.
 
-Register with `POST /auth/register` using `fullName`, `address`, `phoneNumber`, `email`, and `password`; new accounts always receive the `USER` role. Use `POST /auth/login` with email or username to get a 15-minute JWT, then click **Authorize** in Swagger and enter the token. The API hashes passwords with bcryptjs. Protected user and operational routes require a bearer token. Users can read their own record; admins can list and read users, update profile/login credentials, delete accounts, and reset passwords. These reads and mutations are audited. A superadmin can create multiple admin accounts through `POST /users/admins` with a full name, unique username, and password; email is optional. Only a `SUPERADMIN` can read permanent audit records from the audit database.
+### Register and log in
 
-Registration and login successes/failures, admin creation attempts, rejected tokens, denied authorization, user reads and mutations, password resets, and audit-log reads (including the actor's ID and role) are written to the main database outbox and later persisted in the audit database. The superadmin audit-log endpoint reads records only from the audit database; the main database outbox is internal publisher storage, not an audit-log query source. Passwords and tokens are never included in audit metadata.
+Register a regular user at `POST /auth/register` with all five fields below. Registration creates a `USER` account but does not issue a token; log in next to receive a 15-minute JWT.
+
+```json
+{
+  "fullName": "Avery Example",
+  "address": "10 Main Street",
+  "phoneNumber": "+1 555 0100",
+  "email": "avery@example.com",
+  "password": "a-strong-password"
+}
+```
+
+Use `POST /auth/login` with either `email` or `username` and the password. Click **Authorize** in Swagger and enter the returned token. The API hashes passwords with bcryptjs; protected routes require a bearer token.
+
+### Account roles
+
+The bootstrap command creates the first `SUPERADMIN`. A superadmin can create multiple `ADMIN` accounts through `POST /users/admins`. Each admin requires a full name, a unique username, and a password; email, address, and phone number are optional for admin accounts. Admins can log in with their username and password.
+
+```json
+{
+  "fullName": "Morgan Admin",
+  "username": "morgan.admin",
+  "password": "another-strong-password"
+}
+```
+
+Admins can list and read users, update profile/login credentials, delete accounts, and reset passwords. Users can read their own profile. These reads and mutations are audited with the acting account's ID and role.
+
+Only a `SUPERADMIN` can read permanent audit records through `GET /audit-logs`; those records come from the separate audit database. The main-database outbox is internal publisher storage and is not exposed as an audit-log endpoint. Superadmins can also inspect Redis queue counts through `GET /queue-stats`.
+
+Registration and login successes/failures, admin creation attempts, rejected tokens, denied authorization, user reads and mutations, password resets, and audit-log reads are written to the main database outbox and later persisted in the audit database. Passwords and tokens are never included in audit metadata.
 
 ## HLD alignment
 
@@ -162,7 +192,7 @@ npm install
 npm run db:setup
 ```
 
-This generates both Prisma clients, creates `audit_logs_dev` if needed, applies the audit schema, copies any legacy audit rows from the old main database, then applies the main schema migration (which removes the old audit table after the copy). The PostgreSQL init script creates the audit database on fresh Docker volumes; `db:setup` also handles existing volumes.
+This generates both Prisma clients, creates `audit_logs_dev` if needed, applies the audit schema, copies any legacy audit rows from the old main database, then applies the main schema migrations. These migrations add the user/profile and admin-username fields and remove the old audit table after its rows are copied. The PostgreSQL init script creates the audit database on fresh Docker volumes; `db:setup` also handles existing volumes.
 
 Stop any older API or worker processes before running this migration. The setup copies existing `audit_logs` rows into the audit database before dropping the legacy table from the main database; the copy is idempotent by `eventId`.
 
@@ -186,7 +216,7 @@ npm run audit:worker        # separate terminal: Redis → audit database
 
 The API and publisher need `DATABASE_URL`; the API and worker need `AUDIT_DATABASE_URL`; all three processes need `REDIS_URL`.
 
-In Swagger, first call `POST /auth/register` with `fullName`, `address`, `phoneNumber`, `email`, and `password`, or log in with the bootstrap superadmin account at `POST /auth/login`. Click **Authorize** and paste the returned access token. Then try `POST /users` with the same profile fields to create a user as an administrator. A successful user mutation creates a `PENDING` outbox row in the same transaction as the user change. The publisher sends it to Redis and marks it `PUBLISHED`; the worker then writes it into `audit_logs`.
+In Swagger, log in with the bootstrap superadmin account at `POST /auth/login` and click **Authorize** with the returned token. Use `POST /users/admins` to create an admin account, or `POST /auth/register` to register a regular user. An admin can also create regular users through `POST /users`. Successful user mutations create a `PENDING` outbox row in the same transaction as the user change. The publisher sends it to Redis and marks it `PUBLISHED`; the worker then writes it into `audit_logs`.
 
 ## Progress
 
@@ -199,7 +229,8 @@ In Swagger, first call `POST /auth/register` with `fullName`, `address`, `phoneN
 | Outbox publisher and BullMQ queue | Implemented |
 | Separate audit Prisma schema/database and idempotent worker | Implemented |
 | Swagger UI and OpenAPI contract | Implemented |
-| Public registration, JWT login, password hashing, role checks, and authentication audit events | Implemented |
+| Public registration, JWT login by email/username, password hashing, and authentication audit events | Implemented |
+| Superadmin provisioning of multiple audited admin accounts | Implemented |
 | Legacy audit row copy before removing the main database table | Included in `db:setup` |
 
 ## Next steps
