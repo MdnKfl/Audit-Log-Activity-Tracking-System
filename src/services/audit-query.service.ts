@@ -1,20 +1,17 @@
 import { auditService } from './audit.service';
 import { auditRepository } from '../repositories/audit.repository';
-import { outboxRepository } from '../repositories/outbox.repository';
 import { auditQueue } from '../infrastructure/redis/audit.queue';
 import { transactionManager } from '../infrastructure/database/transaction';
 import type { AuditLogQuery } from '../validators/audit.validator';
 
+/** Read-only audit/queue workflows; audit records always come from the separate audit database. */
 export const auditQueryService = {
+  /** Reads BullMQ counts for operations monitoring; this does not read either database. */
   queueStats() {
     return auditQueue.getJobCounts('waiting', 'active', 'delayed', 'completed', 'failed');
   },
 
-  async outboxStats() {
-    const groups = await outboxRepository.countByStatus();
-    return Object.fromEntries(groups.map(({ status, _count }) => [status.toLowerCase(), _count._all]));
-  },
-
+  /** Queries permanent audit rows and queues an AUDIT_LOGS_VIEWED event with the viewer identity. */
   async listAuditLogs(query: AuditLogQuery, adminId: string, adminRole: 'USER' | 'ADMIN' | 'SUPERADMIN') {
     const where = {
       ...(query.eventType && { eventType: query.eventType }),

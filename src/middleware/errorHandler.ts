@@ -5,6 +5,7 @@ import { ZodError } from 'zod';
 import { UserNotFoundError } from '../services/user.service';
 import { InvalidCredentialsError } from '../services/auth.service';
 
+/** Maps expected validation/domain/Prisma errors to HTTP statuses and hides unexpected internals. */
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof ZodError) {
     const details = err.issues.map(({ code, path, message }) => ({ code, path, message }));
@@ -23,7 +24,7 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-    res.status(409).json({ error: 'A user with this email already exists' });
+    res.status(409).json({ error: 'A user with this email or username already exists' });
     return;
   }
 

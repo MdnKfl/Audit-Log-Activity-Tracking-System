@@ -86,7 +86,7 @@ For a source-only guide that explains the purpose of each `src/` folder and how 
 
 ## Database model
 
-The main database contains `users` (UUID, full name, address, phone number, unique email, password hash, role, created/updated timestamps) and `outbox_events`. The outbox mirrors the audit event columns in `audit_logs`—event ID/type, actor, resource, outcome, metadata, and occurrence time—with additional delivery status, creation/publication timestamps, and last error. The publisher maps those columns into the shared `AuditEvent` before sending it to Redis. The audit database stores the permanent `audit_logs` rows, uniquely keyed by event ID.
+The main database contains `users` (UUID, full name, address, phone number, unique username, nullable unique email, password hash, role, created/updated timestamps) and `outbox_events`. The outbox mirrors the audit event columns in `audit_logs`—event ID/type, actor, resource, outcome, metadata, and occurrence time—with additional delivery status, creation/publication timestamps, and last error. The publisher maps those columns into the shared `AuditEvent` before sending it to Redis. The audit database stores the permanent `audit_logs` rows, uniquely keyed by event ID.
 
 `generated/` contains Prisma-generated TypeScript clients for the two schemas. Application code imports these clients for typed database access. Do not edit generated files directly; `npm run db:generate` recreates them from the Prisma schemas. The obsolete single-client `generated/prisma/` directory has been removed.
 
@@ -110,9 +110,9 @@ The worker runs with `concurrency: 5`.
 
 After starting the API, open [http://localhost:3000/api-docs](http://localhost:3000/api-docs). Use **Try it out** to call the endpoints. The raw OpenAPI document is at `/openapi.json`.
 
-Register with `POST /auth/register` using `fullName`, `address`, `phoneNumber`, `email`, and `password`; new accounts always receive the `USER` role. Use `POST /auth/login` to get a 15-minute JWT, then click **Authorize** in Swagger and enter the token. The API hashes passwords with bcryptjs. Protected user and operational routes require a bearer token. Users can read their own record; admins can list and read users, update profile/login email, delete accounts, and reset passwords. These reads and mutations are audited. Only a `SUPERADMIN` can access audit records and queue/outbox statistics.
+Register with `POST /auth/register` using `fullName`, `address`, `phoneNumber`, `email`, and `password`; new accounts always receive the `USER` role. Use `POST /auth/login` with email or username to get a 15-minute JWT, then click **Authorize** in Swagger and enter the token. The API hashes passwords with bcryptjs. Protected user and operational routes require a bearer token. Users can read their own record; admins can list and read users, update profile/login credentials, delete accounts, and reset passwords. These reads and mutations are audited. A superadmin can create multiple admin accounts through `POST /users/admins` with a full name, unique username, and password; email is optional. Only a `SUPERADMIN` can read permanent audit records from the audit database.
 
-Registration and login successes/failures, rejected tokens, denied authorization, user reads and mutations, password resets, and audit-log reads (including the actor role) are written to the main database outbox and later persisted in the audit database. Passwords and tokens are never included in audit metadata.
+Registration and login successes/failures, admin creation attempts, rejected tokens, denied authorization, user reads and mutations, password resets, and audit-log reads (including the actor's ID and role) are written to the main database outbox and later persisted in the audit database. The superadmin audit-log endpoint reads records only from the audit database; the main database outbox is internal publisher storage, not an audit-log query source. Passwords and tokens are never included in audit metadata.
 
 ## HLD alignment
 

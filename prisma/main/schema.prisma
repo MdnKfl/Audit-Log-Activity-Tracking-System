@@ -1,7 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Main-database schema: business user accounts and their transactionally written audit outbox.
 
 generator client {
   provider = "prisma-client"
@@ -12,12 +9,16 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Business accounts used by registration, JWT authentication, and user-management endpoints.
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   fullName     String   @map("full_name") @db.VarChar(100)
   address      String?  @db.VarChar(500)
   phoneNumber  String?  @map("phone_number") @db.VarChar(30)
-  email        String   @unique @db.VarChar(254)
+  /// Optional sign-in name used by administrator accounts; unique when present.
+  username     String?  @unique @db.VarChar(32)
+  /// Required by public USER registration; nullable so admins can use username-only sign-in.
+  email        String?  @unique @db.VarChar(254)
   passwordHash String?  @map("password_hash")
   role         String   @default("USER") @db.VarChar(20)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -26,6 +27,7 @@ model User {
   @@map("users")
 }
 
+/// Internal event staging table; each business mutation and its event are committed together.
 model OutboxEvent {
   id           String   @id @default(uuid()) @db.Uuid
   eventId      String   @unique @map("event_id") @db.Uuid

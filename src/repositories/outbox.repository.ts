@@ -3,8 +3,10 @@ import type { Prisma } from '../../generated/main-client/client';
 import { prisma } from '../infrastructure/database/main.client';
 import type { AuditEvent } from '../types/audit.types';
 
+/** Main-database persistence for events waiting to be published; workers do not query this repository. */
 export const outboxRepository = {
   // Called with the business transaction client so the outbox event commits with the user change.
+  /** Writes the event's searchable columns to internal publisher storage. */
   insert(tx: Prisma.TransactionClient, event: AuditEvent) {
     return tx.outboxEvent.create({
       data: {
@@ -19,9 +21,5 @@ export const outboxRepository = {
         occurredAt: new Date(event.occurredAt),
       },
     });
-  },
-
-  countByStatus() {
-    return prisma.outboxEvent.groupBy({ by: ['status'], _count: { _all: true } });
   },
 };

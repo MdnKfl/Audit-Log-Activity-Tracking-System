@@ -3,20 +3,29 @@ import { z, ZodError } from 'zod';
 import { auditService } from './audit.service';
 import { transactionManager } from '../infrastructure/database/transaction';
 import { userRepository } from '../repositories/user.repository';
-import { createUserSchema, emailSchema, passwordSchema } from '../validators/user.validator';
+import { createUserSchema, emailSchema, passwordSchema, usernameSchema } from '../validators/user.validator';
 import { createAccessToken, accessTokenLifetimeSeconds } from '../security/jwt';
 import { hashPassword, verifyPassword } from '../security/password';
 
-const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
+// Accept exactly one login identity so normal users can use email and admins can use username.
+const loginSchema = z.object({
+  email: emailSchema.optional(),
+  username: usernameSchema.optional(),
+  password: passwordSchema,
+}).refine((credentials) => Boolean(credentials.email) !== Boolean(credentials.username), {
+  message: 'Provide either email or username',
+});
 
+/** Gives the HTTP error handler one generic response for an unknown identity or wrong password. */
 export class InvalidCredentialsError extends Error {
   constructor() {
-    super('Invalid email or password');
+    super('Invalid email/username or password');
     this.name = 'InvalidCredentialsError';
   }
 }
 
 // Authentication failures should be audited without logging submitted credentials or masking the API error.
+/** Best-effort audit write for requests that fail before a business transaction can commit. */
 async function recordFailure(eventType: string, resourceType: string, reason: string) {
   try {
     await transactionManager.execute((tx) => auditService.record(tx, {
@@ -31,7 +40,9 @@ async function recordFailure(eventType: string, resourceType: string, reason: st
   }
 }
 
+/** Authentication workflows shared by the public auth controller and user account provisioning. */
 export const authService = {
+  /** Validates registration, stores a password hash, and writes USER_REGISTERED with the new account. */
   async register(input: unknown) {
     try {
       const data = createUserSchema.parse(input);
@@ -64,6 +75,7 @@ export const authService = {
     }
   },
 
+  /** Verifies credentials, records the result, anandd issues a JWT only after a successful audit write. */
   async login(input: unknown) {
     // Parse and normalize input before looking up credentials or creating audit records.
     let credentials: z.infer<typeof loginSchema>;
@@ -77,7 +89,10 @@ export const authService = {
       );
       throw error;
     }
-    const user = await userRepository.findCredentialsByEmail(credentials.email);
+    const identity = credentials.email
+      ? { type: 'email' as const, value: credentials.email }
+      : { type: 'username' as const, value: credentials.username! };
+    const user = await userRepository.findCredentialsByIdentity(identity);
     const accepted = user?.passwordHash
       ? await verifyPassword(credentials.password, user.passwordHash)
       : false;
@@ -105,7 +120,7 @@ export const authService = {
       accessToken,
       tokenType: 'Bearer',
       expiresIn: accessTokenLifetimeSeconds,
-      user: { id: user.id, email: user.email, role: user.role },
+      user: { id: user.id, email: user.email, username: user.username, role: user.role },
     };
   },
 };
