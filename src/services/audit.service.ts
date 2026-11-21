@@ -5,9 +5,11 @@ import { getRequestContext } from '../middleware/requestContext';
 import { auditEventSchema, type AuditEventInput } from '../types/audit.types';
 import { outboxRepository } from '../repositories/outbox.repository';
 
+// Key names matching this pattern are removed so credentials cannot leak into long-lived audit history.
 const sensitiveKey = /password|token|otp|secret|authorization/i;
 
 // Audit metadata may contain request data, so remove secrets recursively before persistence.
+/** Recursively removes sensitive properties from nested audit metadata before persistence. */
 function redact(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redact);
   if (value && typeof value === 'object') {
@@ -18,7 +20,9 @@ function redact(value: unknown): unknown {
   return value;
 }
 
+/** Shared event factory used by all services/middleware before an event enters the outbox. */
 export const auditService = {
+  /** Builds the common event envelope and inserts it into the caller's main-database transaction. */
   record(
     tx: Prisma.TransactionClient,
     input: AuditEventInput,

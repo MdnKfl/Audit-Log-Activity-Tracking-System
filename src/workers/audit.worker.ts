@@ -8,6 +8,7 @@ import { connection } from '../infrastructure/redis/redis.client';
 import { AUDIT_QUEUE } from '../infrastructure/redis/audit.queue';
 import { auditRepository } from '../repositories/audit.repository';
 
+// BullMQ owns delivery/retry mechanics; this callback owns validation and durable audit persistence.
 const worker = new Worker(
   AUDIT_QUEUE,
   async (job) => {
@@ -31,11 +32,13 @@ const worker = new Worker(
   { connection, concurrency: 5 },
 );
 
+// Keep the event ID and retry count in logs to make failed jobs traceable during operations.
 worker.on('failed', (job, error) => {
   console.error(`Audit job ${job?.id} failed (attempt ${job?.attemptsMade}):`, error.message);
 });
 
 let shuttingDown = false;
+/** Stops intake before closing the worker's database and Redis connections. */
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;

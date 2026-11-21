@@ -28,6 +28,13 @@ For example, `PATCH /users/:id` is registered in `routes/user.route.ts`. Authent
 
 `services/audit.service.ts` creates the event using the shared schema from `types/audit.types.ts`, adds safe request metadata, and removes secret-looking metadata keys. `repositories/outbox.repository.ts` stores it in the main database with the business change. `workers/outbox.publisher.ts` validates and sends it to the BullMQ queue. `workers/audit.worker.ts` validates it again and calls `repositories/audit.repository.ts`, which writes to the separate permanent audit database. Event IDs make retries safe against duplicate audit rows.
 
+## Account roles
+
+- `USER` accounts register through `POST /auth/register` and use email/password login.
+- A `SUPERADMIN` creates one or more `ADMIN` accounts through `POST /users/admins`. Admins can log in with their unique username and password; email is optional for an admin account.
+- `ADMIN` accounts manage regular user records. Their own actions are attributed by actor ID and role in audit metadata.
+- Only `SUPERADMIN` can read `/audit-logs`. The query uses the audit database repository. Outbox rows remain internal to the publisher and are not exposed as an audit-log endpoint.
+
 ## Shared types versus validation
 
 - Use `types/` for contracts that multiple parts/processes must agree on, especially the queued `AuditEvent`.

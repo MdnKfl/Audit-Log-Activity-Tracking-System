@@ -4,12 +4,13 @@ import { prisma } from '../infrastructure/database/main.client';
 import { hashPassword } from '../security/password';
 import { emailSchema, passwordSchema } from '../validators/user.validator';
 
+/** Creates the first SUPERADMIN or restores its credentials from the protected environment settings. */
 async function main() {
   const email = emailSchema.parse(process.env.BOOTSTRAP_ADMIN_EMAIL);
   const password = passwordSchema.parse(process.env.BOOTSTRAP_ADMIN_PASSWORD);
   const passwordHash = await hashPassword(password);
 
-  // Running this command again intentionally resets this admin's password to the configured value.
+  // Running this command again intentionally restores this superadmin's configured password and role.
   const admin = await prisma.user.upsert({
     where: { email },
     create: {
@@ -26,6 +27,7 @@ async function main() {
   console.log(`Superadmin account is ready (${admin.role}).`);
 }
 
+// Report configuration failures without printing secrets and always disconnect Prisma before exiting.
 void main()
   .catch((error) => {
     if (error instanceof ZodError) {

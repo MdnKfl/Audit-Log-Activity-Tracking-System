@@ -3,12 +3,16 @@ import { Pool } from 'pg';
 import { Prisma } from '../../generated/audit-client/client';
 import { auditPrisma } from '../infrastructure/database/audit.client';
 
+// The old audit table lives in the main database; rows are copied out before that table is removed.
 const mainUrl = process.env.DATABASE_URL;
 if (!mainUrl) throw new Error('DATABASE_URL must be set');
 
+// Dedicated SQL connection reads the old schema, which no longer exists in the current Prisma model.
 const mainPool = new Pool({ connectionString: mainUrl });
+// Legacy identifiers are not guaranteed to be UUIDs, while the new schema requires UUID actor/resource IDs.
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Removes credential-like properties while preserving safe context from legacy metadata. */
 function redact(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redact);
   if (value && typeof value === 'object') {
@@ -20,6 +24,7 @@ function redact(value: unknown): unknown {
   return value;
 }
 
+/** Copies legacy rows in ordered batches and skips event IDs already imported in an earlier run. */
 async function migrate() {
   // Older versions stored audit rows beside business data; copy them to permanent audit storage.
   const { rows: [table] } = await mainPool.query("SELECT to_regclass('public.audit_logs') AS name");
@@ -78,6 +83,7 @@ async function migrate() {
   console.log(`Copied or already migrated ${copied} legacy audit rows.`);
 }
 
+/** Owns cleanup for both database connections even when the copy operation fails. */
 async function main() {
   try {
     await migrate();

@@ -1,3 +1,4 @@
+-- Create the permanent audit store separately from user records and outbox delivery state.
 CREATE TABLE "audit_logs" (
     "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,

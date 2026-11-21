@@ -1,3 +1,4 @@
+-- Create internal outbox staging; legacy audit history is copied before the old table is dropped below.
 CREATE TABLE "outbox_events" (
     "id" UUID NOT NULL,
     "event_id" UUID NOT NULL,

@@ -6,14 +6,17 @@ import { transactionManager } from '../infrastructure/database/transaction';
 import { userRepository } from '../repositories/user.repository';
 import { verifyAccessToken } from '../security/jwt';
 
+/** Verified identity shared by downstream controllers after authenticate succeeds. */
 export type AuthContext = { userId: string; role: 'USER' | 'ADMIN' | 'SUPERADMIN' };
 
+/** Reads identity placed in res.locals by authenticate; throws if route middleware was misconfigured. */
 export function getAuthContext(res: Response): AuthContext {
   const context = (res.locals as { auth?: AuthContext }).auth;
   if (!context) throw new Error('Authentication middleware was not applied');
   return context;
 }
 
+/** Stores authentication/authorization failures without allowing audit outages to change the HTTP response. */
 async function recordAuthEvent(
   eventType: string,
   actor: AuditActor,
@@ -34,6 +37,7 @@ async function recordAuthEvent(
   }
 }
 
+/** Validates a bearer JWT and reloads the user's current role before protected handlers run. */
 export const authenticate: RequestHandler = async (req, res, next) => {
   const authorization = req.get('authorization');
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
@@ -67,6 +71,7 @@ export const authenticate: RequestHandler = async (req, res, next) => {
   next();
 };
 
+/** Allows ADMIN and SUPERADMIN accounts to use user-management routes. */
 export const requireAdmin: RequestHandler = async (req, res, next) => {
   const auth = getAuthContext(res);
   if (auth.role === 'ADMIN' || auth.role === 'SUPERADMIN') return next();
@@ -78,6 +83,7 @@ export const requireAdmin: RequestHandler = async (req, res, next) => {
   res.status(403).json({ error: 'Administrator access required' });
 };
 
+/** Reserves audit-log and admin-creation routes for the SUPERADMIN role. */
 export const requireSuperAdmin: RequestHandler = async (req, res, next) => {
   const auth = getAuthContext(res);
   if (auth.role === 'SUPERADMIN') return next();
@@ -90,6 +96,7 @@ export const requireSuperAdmin: RequestHandler = async (req, res, next) => {
   res.status(403).json({ error: 'Superadmin access required' });
 };
 
+/** Lets users read their own profile while admins may read any user's profile. */
 export const requireSelfOrAdmin: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   const auth = getAuthContext(res);
   if (auth.role === 'ADMIN' || auth.role === 'SUPERADMIN' || auth.userId === req.params.id) return next();

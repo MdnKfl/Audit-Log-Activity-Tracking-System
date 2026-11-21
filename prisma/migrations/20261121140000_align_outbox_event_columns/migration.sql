@@ -1,3 +1,4 @@
+-- Expand legacy JSON payloads into columns matching audit_logs so the publisher can validate/map them.
 ALTER TABLE "outbox_events"
 ADD COLUMN "actor_id" UUID,
 ADD COLUMN "actor_type" VARCHAR(20),

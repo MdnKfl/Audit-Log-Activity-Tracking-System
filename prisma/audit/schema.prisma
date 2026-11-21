@@ -1,3 +1,4 @@
+// Separate database schema for permanent audit history; workers write here after Redis delivery.
 generator client {
   provider = "prisma-client"
   output   = "../../generated/audit-client"
@@ -7,6 +8,7 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Durable, queryable audit history; this table is separate from business data and the outbox.
 model AuditLog {
   id           String   @id @default(uuid()) @db.Uuid
   eventId      String   @unique @map("event_id") @db.Uuid

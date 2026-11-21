@@ -2,9 +2,11 @@ import { Queue } from 'bullmq';
 // Shared queue definition so the publisher and worker agree on the queue name and retry policy.
 import { connection } from './redis.client';
 
+/** Shared queue name: both the outbox publisher and audit worker must use the same value. */
 export const AUDIT_QUEUE = 'nestsms-audit-logs';
 
 // Retained job IDs make publisher retries safe; backoff retries transient worker failures.
+/** BullMQ producer handle configured with bounded retention and retry backoff. */
 export const auditQueue = new Queue(AUDIT_QUEUE, {
   connection,
   defaultJobOptions: {

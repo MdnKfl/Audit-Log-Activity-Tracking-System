@@ -3,6 +3,7 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Prisma CLI settings for the main database schema (users and outbox_events).
 export default defineConfig({
   schema: "prisma/main/schema.prisma",
   migrations: {

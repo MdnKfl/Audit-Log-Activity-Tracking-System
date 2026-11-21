@@ -5,12 +5,15 @@ import { prisma } from '../infrastructure/database/main.client';
 import { connection } from '../infrastructure/redis/redis.client';
 import { auditQueue } from '../infrastructure/redis/audit.queue';
 
+// Bound database and memory work per poll while keeping newly committed events moving promptly.
 const batchSize = 50;
+// Poll once per second so newly committed audit events do not wait long before publishing.
 const pollIntervalMs = 1_000;
+// Set by process signal handlers so the loop can finish its current batch before closing dependencies.
 let stopping = false;
 
+/** Reads committed PENDING rows, publishes each event, then marks successful Redis handoffs. */
 async function publishPendingEvents() {
-  // Limit each poll so a backlog does not require loading the entire outbox into memory.
   const pending = await prisma.outboxEvent.findMany({
     where: { status: 'PENDING' },
     orderBy: { createdAt: 'asc' },
@@ -51,6 +54,7 @@ async function publishPendingEvents() {
   }
 }
 
+/** Repeats polling until shutdown; transient database/Redis errors are logged and retried next cycle. */
 async function run() {
   console.log('Outbox publisher started');
   while (!stopping) {
@@ -63,8 +67,10 @@ async function run() {
   }
 }
 
+// Keep the publisher active for the lifetime of this process and reuse its promise during shutdown.
 const runPromise = run();
 
+/** Waits for the poll loop to stop before closing queue, Redis, and main database resources. */
 async function shutdown() {
   stopping = true;
   await runPromise;

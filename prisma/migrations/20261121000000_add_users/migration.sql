@@ -1,3 +1,4 @@
+-- Create business accounts in the main database; authentication fields are added by a later migration.
 CREATE TABLE "users" (
     "id" UUID NOT NULL,
     "name" VARCHAR(100) NOT NULL,

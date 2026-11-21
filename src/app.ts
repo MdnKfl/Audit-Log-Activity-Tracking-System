@@ -8,6 +8,7 @@ import { authRouter } from './routes/auth.route';
 import { auditRouter } from './routes/audit.route';
 import { systemRouter } from './routes/system.route';
 
+/** Exported Express app so routes can be composed here and the server can own process startup. */
 export const app = express();
 
 app.use(express.json());

@@ -1,5 +1,9 @@
+# Installed dependencies are restored from package-lock.json.
 node_modules/
+# Local credentials and connection URLs must stay on the developer machine.
 .env
+# Prisma clients are generated from schemas by npm run db:generate.
 /generated/
+# Build and test output can be recreated from source.
 dist/
 coverage/
