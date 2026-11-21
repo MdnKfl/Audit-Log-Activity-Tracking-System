@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+ "scripts": {
+  "load-test": "tsx src/load-test.ts",
+  "db:count": "docker compose exec postgres psql -U nestsms -d audit_dev -c 'select count(*) from audit_logs;'",
+  "demo:reset": "docker compose exec redis redis-cli flushall && docker compose exec postgres psql -U nestsms -d audit_dev -c 'TRUNCATE audit_logs;'",
+  "db:latest": "docker compose exec postgres psql -U nestsms -d audit_dev -c 'select action, \"userId\", \"ipAddress\", \"createdAt\" from audit_logs order by \"createdAt\" desc limit 10;'"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MdnKfl/Audit-Log-Activity-Tracking-System.git"

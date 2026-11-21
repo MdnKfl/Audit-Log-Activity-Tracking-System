@@ -16,4 +16,4 @@ export const auditEventSchema = auditInputSchema.extend({
   ipAddress: z.string().optional(),
   userAgent: z.string().optional(),
   occurredAt: z.string().datetime(),
-});
+}); 

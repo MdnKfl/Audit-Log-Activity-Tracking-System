@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import { Worker, UnrecoverableError } from 'bullmq';
 import { Prisma } from '../generated/prisma/client';
-import { prisma } from './config/prisma';
-import { connection } from './config/redis';
+import { prisma } from './config/prisma.config';
+import { connection } from './config/redis.config';
 import { AUDIT_QUEUE } from './queues/audit-log.queue';
-import { auditEventSchema } from './modules/audit-log/audit-log.schema';
+import { auditEventSchema } from './modules/audit-log/audit-log.vaalidator';
 
 
 const worker = new Worker(
@@ -35,12 +35,12 @@ const worker = new Worker(
       });
       console.log('Saved audit log:', e.eventId);
     } catch (err) {
-      // 3. Duplicate eventId means it was already saved, so count it as success
+      // 3. Duplicate eventId means it was already saved)
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         console.log('Duplicate, already processed:', e.eventId);
         return;
       }
-      throw err; // anything else (DB down, etc.) makes BullMQ retry
+      throw err; // anything else (DB down, etc.) makes BullMQ ret  ry
     }
   },
   { connection, concurrency: 5 },
@@ -54,7 +54,7 @@ worker.on('failed', (job, err) => {
 async function shutdown() {
   await worker.close();
   await prisma.$disconnect();
-  process.exit(0);
+  process.exit(0);  
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

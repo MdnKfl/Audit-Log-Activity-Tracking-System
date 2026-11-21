@@ -1,5 +1,5 @@
 import { Queue } from 'bullmq';
-import { connection } from '../config/redis';
+import { connection } from '../config/redis.config';
 
 export const AUDIT_QUEUE = 'nestsms-audit-logs';
 

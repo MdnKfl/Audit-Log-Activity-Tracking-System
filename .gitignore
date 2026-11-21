@@ -2,4 +2,14 @@ node_modules
 .env
 /generated/prisma
 
-
+controller --> filename.controller.js ts jsx tsx 
+middleware  ---> requestContext.middleware.js ts jsx tsx
+model
+route
+service
+repository
+utils
+types
+components
+curl -X POST localhost:3000/clients -H "Content-Type: application/json" -H "x-user-id: user-42" -d '{"name":"Acme","password":"secret"}'
+curl localhost:3000/queue-stats
