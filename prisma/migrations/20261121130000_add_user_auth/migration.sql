@@ -1,0 +1,3 @@
+ALTER TABLE "users"
+ADD COLUMN "password_hash" TEXT,
+ADD COLUMN "role" VARCHAR(20) NOT NULL DEFAULT 'USER';

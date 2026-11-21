@@ -7,6 +7,8 @@ services:
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: audit_dev
     ports: ["5433:5432"]
+    volumes:
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
   redis:
     image: redis:7
     container_name: audit-redis

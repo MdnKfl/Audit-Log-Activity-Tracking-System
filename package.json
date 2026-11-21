@@ -3,12 +3,18 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
- "scripts": {
-  "load-test": "tsx src/load-test.ts",
-  "db:count": "docker compose exec postgres psql -U nestsms -d audit_dev -c 'select count(*) from audit_logs;'",
-  "demo:reset": "docker compose exec redis redis-cli flushall && docker compose exec postgres psql -U nestsms -d audit_dev -c 'TRUNCATE audit_logs;'",
-  "db:latest": "docker compose exec postgres psql -U nestsms -d audit_dev -c 'select action, \"userId\", \"ipAddress\", \"createdAt\" from audit_logs order by \"createdAt\" desc limit 10;'"
-},
+  "scripts": {
+    "api": "node --import tsx src/server.ts",
+    "outbox:publisher": "node --import tsx src/workers/outbox.publisher.ts",
+    "audit:worker": "node --import tsx src/workers/audit.worker.ts",
+    "auth:bootstrap-admin": "node --import tsx src/scripts/bootstrapAdmin.ts",
+    "db:generate": "prisma generate --config prisma7.config.ts && prisma generate --config prisma.audit.config.ts",
+    "db:create-audit": "node --import tsx src/scripts/createAuditDatabase.ts",
+    "db:setup": "npm run db:generate && npm run db:create-audit && prisma migrate deploy --config prisma.audit.config.ts && node --import tsx src/scripts/migrateLegacyAuditLogs.ts && prisma migrate deploy --config prisma7.config.ts",
+    "db:count": "docker compose exec postgres psql -U nestsms -d audit_logs_dev -c 'select count(*) from audit_logs;'",
+    "demo:reset": "docker compose exec redis redis-cli flushall && docker compose exec postgres psql -U nestsms -d audit_dev -c 'TRUNCATE outbox_events;' && docker compose exec postgres psql -U nestsms -d audit_logs_dev -c 'TRUNCATE audit_logs;'",
+    "db:latest": "docker compose exec postgres psql -U nestsms -d audit_logs_dev -c 'select event_type, actor_id, resource_type, resource_id, occurred_at from audit_logs order by occurred_at desc limit 10;'"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MdnKfl/Audit-Log-Activity-Tracking-System.git"
@@ -24,17 +30,21 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "bcryptjs": "^3.0.3",
     "bullmq": "^6.7.6",
     "dotenv": "^18.0.10",
     "express": "^5.3.0",
     "ioredis": "^6.0.0",
+    "jose": "^6.2.18",
     "pg": "^8.23.1",
+    "swagger-ui-express": "^5.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "prisma": "^7.10.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
