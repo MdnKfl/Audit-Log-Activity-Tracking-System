@@ -26,14 +26,38 @@ export class InvalidCredentialsError extends Error {
 
 // Authentication failures should be audited without logging submitted credentials or masking the API error.
 /** Best-effort audit write for requests that fail before a business transaction can commit. */
-async function recordFailure(eventType: string, resourceType: string, reason: string) {
+/** Keeps a bounded, non-secret identifier so an auditor can investigate failed attempts. */
+function attemptedIdentity(input: unknown): Record<string, string> {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return {};
+
+  const body = input as Record<string, unknown>;
+  const clean = (value: unknown, maxLength: number, lowercase = false) => {
+    if (typeof value !== 'string') return undefined;
+    const normalized = value.trim().replace(/[\u0000-\u001f\u007f]/g, '').slice(0, maxLength);
+    return normalized ? (lowercase ? normalized.toLowerCase() : normalized) : undefined;
+  };
+  const email = clean(body.email, 254, true);
+  const username = clean(body.username, 32);
+  return {
+    ...(email ? { attemptedEmail: email } : {}),
+    ...(username ? { attemptedUsername: username } : {}),
+  };
+}
+
+async function recordFailure(
+  eventType: string,
+  resourceType: string,
+  reason: string,
+  identity: Record<string, string> = {},
+) {
   try {
     await transactionManager.execute((tx) => auditService.record(tx, {
       eventType,
       actor: { type: 'ANONYMOUS' },
       resource: { type: resourceType },
       outcome: 'FAILURE',
-      metadata: { reason },
+      // Never include the password; only the submitted account identifier helps investigation.
+      metadata: { ...identity, reason },
     }));
   } catch (error) {
     console.error(`Could not enqueue ${eventType} audit event:`, error);
@@ -70,12 +94,13 @@ export const authService = {
         'USER_REGISTRATION_FAILED',
         'USER_REGISTRATION',
         error instanceof ZodError ? 'validation_failed' : 'registration_rejected',
+        attemptedIdentity(input),
       );
       throw error;
     }
   },
 
-  /** Verifies credentials, records the result, anandd issues a JWT only after a successful audit write. */
+  /** Verifies credentials, records the result, and issues a JWT only after a successful audit write. */
   async login(input: unknown) {
     // Parse and normalize input before looking up credentials or creating audit records.
     let credentials: z.infer<typeof loginSchema>;
@@ -86,6 +111,7 @@ export const authService = {
         'AUTH_LOGIN_FAILED',
         'AUTH_SESSION',
         error instanceof ZodError ? 'validation_failed' : 'invalid_credentials',
+        attemptedIdentity(input),
       );
       throw error;
     }
@@ -99,7 +125,12 @@ export const authService = {
 
     if (!user || !accepted) {
       // Record failures in their own transaction because no business mutation occurred.
-      await recordFailure('AUTH_LOGIN_FAILED', 'AUTH_SESSION', 'invalid_credentials');
+      await recordFailure(
+        'AUTH_LOGIN_FAILED',
+        'AUTH_SESSION',
+        'invalid_credentials',
+        attemptedIdentity(credentials),
+      );
       throw new InvalidCredentialsError();
     }
 
