@@ -85,7 +85,12 @@ export const authService = {
           actor: { type: 'USER', id: user.id, role: 'USER' },
           resource: { type: 'USER', id: user.id },
           outcome: 'SUCCESS',
-          metadata: { changedFields: ['fullName', 'address', 'phoneNumber', 'email'] },
+          // Keep the account's identifying email with the event so audit readers need not
+          // query the mutable users table to understand who registered.
+          metadata: {
+            email: user.email,
+            changedFields: ['fullName', 'address', 'phoneNumber', 'email'],
+          },
         });
         return user;
       });
