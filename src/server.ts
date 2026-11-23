@@ -8,8 +8,12 @@ import { auditQueue } from './infrastructure/redis/audit.queue';
 
 // Keep the listen port configurable for local runs and container deployments.
 const port = Number(process.env.PORT) || 3000;
+// Bind to every network interface so another device on the same LAN can reach this development API.
+const host = process.env.HOST || '0.0.0.0';
 // Starting the listener belongs here so importing app.ts does not start a server as a side effect.
-const server = app.listen(port, () => console.log(`API listening on http://localhost:${port}`));
+const server = app.listen(port, host, () => {
+  console.log(`API listening on ${host}:${port}; remote clients must use this computer's LAN IP`);
+});
 
 let isShuttingDown = false;
 

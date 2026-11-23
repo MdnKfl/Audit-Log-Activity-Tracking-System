@@ -173,12 +173,18 @@ DATABASE_URL="postgresql://nestsms:devpassword@localhost:5433/audit_dev"
 AUDIT_DATABASE_URL="postgresql://nestsms:devpassword@localhost:5433/audit_logs_dev"
 REDIS_URL="redis://localhost:6379"
 PORT="3000"
+HOST="0.0.0.0"
+CORS_ORIGINS="*"
 JWT_SECRET="replace-with-64-hex-characters-from-openssl-rand-hex-32"
 BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
 BOOTSTRAP_ADMIN_PASSWORD="replace-with-a-strong-12-character-password"
 ```
 
 Generate the JWT secret with `openssl rand -hex 32`. Set a strong bootstrap admin password. These are development-only credentials; never commit `.env`.
+
+Swagger uses a relative API URL by default, so it calls the same host that served `/api-docs`. The API binds to `0.0.0.0` so a mentor on the same network can use `http://<your-computer-LAN-IP>:3000/api-docs` or send Postman requests to `http://<your-computer-LAN-IP>:3000`. `localhost` always means the computer running the client. Allow inbound TCP port 3000 in your computer's firewall if needed.
+
+`CORS_ORIGINS="*"` enables browser JavaScript from any origin to read API responses, which is appropriate for this public bearer-token API. CORS does not grant a role or bypass JWT checks: protected routes still require a valid token and role. The API does not use cookie authentication, so the wildcard policy does not enable credentialed cookies. For a private deployment, replace `*` with an exact comma-separated list of trusted frontend origins (including scheme and port). Postman, curl, and backend-to-backend requests do not enforce browser CORS; their access depends on the API being network-reachable. For a mentor outside your LAN, use an approved HTTPS tunnel or deploy the API somewhere reachable rather than exposing a development machine directly to the internet.
 
 ### 3. Install dependencies
 
@@ -242,6 +248,7 @@ In Swagger, log in with the bootstrap superadmin account at `POST /auth/login` a
 ## Known limitations
 
 - Audit rows are eventually consistent: they appear after the request commits, publisher runs, and worker persists the event.
+- PostgreSQL `timestamptz` columns preserve the actual instant (normalized internally by PostgreSQL); the setup configures new DB sessions to display timestamps in Nepal time (`+05:45`), and audit-log API responses also use that offset.
 - Concurrent publishers can enqueue the same event more than once. BullMQ job IDs and the audit database's unique event ID make this safe.
 - `FAILED` outbox rows need operator inspection; there is no automatic repair UI yet.
 - JWTs expire after 15 minutes; there is no refresh-token flow yet.

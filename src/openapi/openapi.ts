@@ -30,7 +30,8 @@ export const openApiSpec = {
     version: '1.0.0',
     description: 'User CRUD API with transactional outbox-backed audit events.',
   },
-  servers: [{ url: 'http://localhost:3000', description: 'Local development server' }],
+  // A relative URL makes Swagger call the same host that served the docs, including mentor demos.
+  servers: [{ url: process.env.API_BASE_URL || '/', description: 'This API server' }],
   tags: [
     { name: 'Auth', description: 'Public registration and JWT login' },
     { name: 'Users', description: 'Create and manage users' },

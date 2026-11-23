@@ -4,6 +4,17 @@ import { auditQueue } from '../infrastructure/redis/audit.queue';
 import { transactionManager } from '../infrastructure/database/transaction';
 import type { AuditLogQuery } from '../validators/audit.validator';
 
+/** Formats a stored instant as ISO-like Nepal time with an explicit +05:45 offset. */
+function toNepalTime(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kathmandu',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)!.value;
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}:${value('second')}.${String(date.getUTCMilliseconds()).padStart(3, '0')}+05:45`;
+}
+
 /** Read-only audit/queue workflows; audit records always come from the separate audit database. */
 export const auditQueryService = {
   /** Reads BullMQ counts for operations monitoring; this does not read either database. */
@@ -37,6 +48,12 @@ export const auditQueryService = {
       },
     }));
 
-    return { items, page: query.page, limit: query.limit, total };
+    // Keep UTC in both databases; convert only the API presentation so the original instant is preserved.
+    const localizedItems = items.map((item) => ({
+      ...item,
+      occurredAt: toNepalTime(item.occurredAt),
+      createdAt: toNepalTime(item.createdAt),
+    }));
+    return { items: localizedItems, page: query.page, limit: query.limit, total };
   },
 };
