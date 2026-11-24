@@ -7,21 +7,25 @@ import type { AuditEvent } from '../types/audit.types';
 export const auditRepository = {
   // This targets permanent audit storage; outbox writes belong to outbox.repository.ts.
   /** Inserts one validated event into permanent audit history. */
-  insert(event: AuditEvent) {
-    return auditPrisma.auditLog.create({
-      data: {
-        eventId: event.eventId,
-        eventType: event.eventType,
-        actorId: event.actor.id,
-        actorType: event.actor.type,
-        resourceType: event.resource.type,
-        resourceId: event.resource.id,
-        outcome: event.outcome,
-        metadata: event.metadata as Prisma.InputJsonValue | undefined,
-        occurredAt: new Date(event.occurredAt),
-      },
-    });
-  },
+
+insert(event: AuditEvent) {
+  return auditPrisma.auditLog.create({
+    data: {
+      eventId: event.eventId,
+      eventType: event.eventType,
+      actorId: event.actor.id ?? null,
+      actorType: event.actor.type,
+      resourceType: event.resource.type,
+      resourceId: event.resource.id ?? null,
+      outcome: event.outcome,
+      ...(event.metadata !== undefined && {
+        metadata: event.metadata as Prisma.InputJsonValue,
+      }),
+      occurredAt: new Date(event.occurredAt),
+    },
+  });
+},
+
 
   /** Returns a page of audit records using filters supplied by the validated query service. */
   findMany(where: Prisma.AuditLogWhereInput, skip: number, take: number) {

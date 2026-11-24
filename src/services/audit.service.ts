@@ -35,6 +35,7 @@ export const auditService = {
       ...(actorRole && { actorRole }),
       ...(request?.ip && { ipAddress: request.ip }),
       ...(request?.userAgent && { userAgent: request.userAgent }),
+      ...(request?.location && { geoLocation: request.location }),
     };
     const event = auditEventSchema.parse({
       ...input,

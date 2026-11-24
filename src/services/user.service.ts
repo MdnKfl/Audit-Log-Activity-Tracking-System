@@ -47,15 +47,24 @@ export const userService = {
       const data = createAdminSchema.parse(input);
       const passwordHash = await hashPassword(data.password);
       return await transactionManager.execute(async (tx) => {
-        const admin = await userRepository.create(tx, {
-          fullName: data.fullName,
-          username: data.username,
-          address: data.address,
-          phoneNumber: data.phoneNumber,
-          email: data.email,
-          passwordHash,
-          role: 'ADMIN',
-        });
+const admin = await userRepository.create(tx, {
+  fullName: data.fullName,
+  username: data.username,
+  passwordHash,
+  role: 'ADMIN',
+
+  ...(data.address !== undefined && {
+    address: data.address,
+  }),
+
+  ...(data.phoneNumber !== undefined && {
+    phoneNumber: data.phoneNumber,
+  }),
+
+  ...(data.email !== undefined && {
+    email: data.email,
+  }),
+});
         await auditService.record(tx, {
           eventType: 'ADMIN_CREATED',
           actor,
@@ -116,7 +125,15 @@ export const userService = {
     // Pass the transaction client through both repositories to preserve outbox atomicity.
     return transactionManager.execute(async (tx) => {
       // Let the database perform the update directly; a missing row aborts the whole transaction.
-      const user = await userRepository.update(tx, validId, data);
+      const updateData = {
+  ...(data.fullName !== undefined && { fullName: data.fullName }),
+  ...(data.address !== undefined && { address: data.address }),
+  ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
+  ...(data.email !== undefined && { email: data.email }),
+  ...(data.username !== undefined && { username: data.username }),
+};
+
+const user = await userRepository.update(tx, validId, updateData);
       await auditService.record(tx, {
         eventType: 'USER_UPDATED',
         actor,

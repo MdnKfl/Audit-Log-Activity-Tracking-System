@@ -39,18 +39,19 @@ async function recordAuthEvent(
 
 /** Validates a bearer JWT and reloads the user's current role before protected handlers run. */
 export const authenticate: RequestHandler = async (req, res, next) => {
-  const authorization = req.get('authorization');
-  const match = authorization?.match(/^Bearer\s+(.+)$/i);
-  if (!match) {
-    await recordAuthEvent('AUTH_TOKEN_REJECTED', { type: 'ANONYMOUS' }, 'FAILURE', { reason: 'missing_bearer_token' });
-    res.status(401).json({ error: 'Authentication required' });
-    return;
-  }
+const authorization = req.get('authorization');
+const match = authorization?.match(/^Bearer\s+(.+)$/i);
+const token = match?.[1];
+
+if (!token) {
+  await recordAuthEvent('AUTH_TOKEN_REJECTED', { type: 'ANONYMOUS' }, 'FAILURE', { reason: 'missing_bearer_token' });
+  res.status(401).json({ error: 'Authentication required' });
+  return;
+}
 
   let userId: string;
   try {
-    userId = await verifyAccessToken(match[1]);
-  } catch {
+userId = await verifyAccessToken(token);  } catch {
     await recordAuthEvent('AUTH_TOKEN_REJECTED', { type: 'ANONYMOUS' }, 'FAILURE', { reason: 'invalid_or_expired_token' });
     res.status(401).json({ error: 'Invalid or expired access token' });
     return;
